@@ -3,6 +3,7 @@ import serial
 import serial.tools.list_ports
 import thread
 import time
+import serial_deal
 
 def str_hex_to_c(s):
     return ''.join(str(chr(int('0x'+ x, 16))) for x in s.split())
@@ -13,65 +14,11 @@ def str_c_to_hex(s):
 def current_time():
     return time.strftime("%Y-%m-%d %H:%M:%S")
 
-class SerialDeal:
-    def __init__(self, fn):
-        self.data = ''
-        self.online = []
-        self.logfile = fn
-
-    def pre_deal(self, instr):
-        self.data += instr
-        start_idx = -1
-        start_idx = self.data.find(chr(0xfe))
-        while -1 != start_idx:
-            data_len = ord(self.data[start_idx + 1])
-            cmd = self.data[start_idx + 2]
-            data_idx = start_idx + 3
-            if self.data[data_idx + data_len] == chr(0xaa):
-                self.deal(cmd, self.data[data_idx : data_idx+data_len])
-                self.data = self.data[data_idx+data_len+1:]
-            else:
-                self.data = self.data[start_idx+1:]
-            start_idx = self.data.find(chr(0xfe))
-
-    def deal(self, cmd, data):
-        devlst = []
-        newlst = []
-        #print 'online:', self.online
-        if cmd == chr(0xa0):
-            n = 0
-            for c in data:
-                if n == 0:
-                    tmpdev = ord(c)
-                else:
-                    tmpdev += ord(c) << 8
-                    devlst.append(tmpdev)
-                    #print type(tmpdev)
-                    if tmpdev in self.online:
-                        #print tmpdev, 'in online'
-                        pass
-                    else:
-                        #print tmpdev, 'not in online'
-                        newlst.append(tmpdev)
-                n = (n+1) % 2
-
-            for tmpdev in self.online:
-                if tmpdev not in devlst:
-                    self.logfile.write(current_time() + ':'
-                            + 'device gone: ' + str(tmpdev))
-
-                    print 'device gone:', str(tmpdev)
-            if newlst.count :
-                self.logfile.write(current_time() + ':'
-                        + 'new device: ' + str(newlst))
-                print 'newlst:',newlst
-            self.online = devlst[:]
-
 class MyFrame(wx.Frame):
     def __init__(self):
         self.serial = serial.Serial()
 
-        wx.Frame.__init__(self, None, id = -1, title = "UART TEST", size = (500, 500), name = "main")
+        wx.Frame.__init__(self, None, id = -1, title = "UART TEST", size = (700, 500), name = "main")
 
         #configuration
         self.cf_panel = wx.Panel(self, -1)
@@ -88,12 +35,13 @@ class MyFrame(wx.Frame):
         #rx
         self.rx_panel = wx.Panel(self, -1)
         self.rx_staticbox = wx.StaticBox(self.rx_panel, -1, "Received Data")
-        self.rx_text = wx.TextCtrl(self.rx_panel, pos = (10, 10), size = (400, 200), style = wx.TE_MULTILINE | wx.TE_READONLY)
+        self.rx_text = wx.TextCtrl(self.rx_panel, pos = (10, 10), size = (700, 200), style = wx.TE_MULTILINE | wx.TE_READONLY | wx.EXPAND)
 
         #tx
         self.tx_panel = wx.Panel(self, -1)
         self.tx_staticbox = wx.StaticBox(self.tx_panel, -1, "Transmit Data")
-        self.tx_text = wx.TextCtrl(self.tx_panel, pos = (10, 210), size = (400, 200), style = wx.TE_MULTILINE)
+        self.tx_text = wx.TextCtrl(self.tx_panel, pos = (10, 210), size = (700, 200), style = wx.TE_MULTILINE | wx.EXPAND)
+        self.button_send = wx.Button(self.tx_panel, -1, label='Send')
 
         self.__set_properties()
         self.__do_layout()
@@ -151,6 +99,7 @@ class MyFrame(wx.Frame):
         self.tx_staticbox.Lower()
         tx_sizer = wx.StaticBoxSizer(self.tx_staticbox, wx.VERTICAL)
         tx_sizer.Add(self.tx_text, 1, wx.EXPAND, 0)
+        tx_sizer.Add(self.button_send, 0, wx.ALIGN_RIGHT, 0)
         self.tx_panel.SetSizer(tx_sizer)
 
         rvsizer = wx.BoxSizer(wx.VERTICAL)
@@ -170,7 +119,7 @@ class MyFrame(wx.Frame):
         self.Bind(wx.EVT_BUTTON, self.onclick_OnOff, self.button_onoff)
         self.Bind(wx.EVT_BUTTON, self.onclick_rxclear, self.button_clear_rx)
         self.Bind(wx.EVT_CHECKBOX, self.oncheck_autoroll, self.checkbox_autoroll)
-        pass
+        self.Bind(wx.EVT_BUTTON, self.oncheck_send, self.button_send)
 
     def onclick_OnOff(self, event):
         if self.button_onoff.GetLabel() == 'Open':
@@ -217,15 +166,15 @@ class MyFrame(wx.Frame):
         self.serial.close()
 
     def serial_receive(self):
-        fn = time.strftime("%Y-%m-%d_%H:%M:%S") + '.log'
+        fn = time.strftime("%Y-%m-%d_%H-%M-%S") + '.log'
         try:
-            logfile = open( fn, 'w+')
+            logfile = open( fn, 'a')
         except IOError as err:
             logfile = None
             print str(err)
 
         if logfile:
-            self.serial_handler = SerialDeal(logfile)
+            self.serial_handler = serial_deal.SerialDeal(logfile)
 
         while self.serial.isOpen():
             n = self.serial.inWaiting()
@@ -264,8 +213,14 @@ class MyFrame(wx.Frame):
             time.sleep(1)
         thread.exit_thread()
 
-
-
+    def oncheck_send(self, event):
+        if self.serial.isOpen():
+            print self.tx_text.GetNumberOfLines()
+            for n in range(0, self.tx_text.GetNumberOfLines()):
+                #print n,
+                outstr = self.tx_text.GetLineText(n)
+                #print outstr
+                self.serial.write(str_hex_to_c(outstr))
 
 class MyApp(wx.App):
     def OnInit(self):
