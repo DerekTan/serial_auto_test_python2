@@ -1,5 +1,6 @@
 import time
 import serial_deal
+import wx
 
 def str_hex_to_c(s):
     return ''.join(str(chr(int('0x'+ x, 16))) for x in s.split())
@@ -10,12 +11,30 @@ def str_c_to_hex(s):
 def current_time():
     return time.strftime("%Y-%m-%d %H:%M:%S")
 
+class MyApp(wx.App):
+    """Test code"""
+    def OnInit(self):
+        #wx.InitAllImageHandlers()
+        #self.frame = DevFrame()
+        #self.frame.Show(True)
+        #self.SetTopWindow(self.frame)
+        return True
+
+# end of class MyApp
+
+if __name__ == "__main__":
+    app = MyApp(0)
+    app.MainLoop()
+
 fn = time.strftime("%Y-%m-%d_%H_%M_%S") + '.log'
 try:
     logfile = open( fn, 'a')
 except IOError as err:
     logfile = None
     print str(err)
+
+app = wx.PySimpleApp()
+app.MainLoop()
 
 if logfile:
     serial_handler = serial_deal.SerialDeal(logfile)

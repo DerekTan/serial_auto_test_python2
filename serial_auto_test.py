@@ -183,7 +183,7 @@ class MyFrame(wx.Frame):
                 if logfile:
                     self.serial_handler.pre_deal(instr)
                 print '[' + instr + ']'
-                self.rx_text.AppendText( time.strftime("%Y-%m-%d %H:%M:%S:") +'['+ str(n) + ':')
+                self.rx_text.AppendText( time.strftime("%H:%M:%S:") +'['+ str(n) + ':')
                 try:
                     self.rx_text.AppendText(instr)
                 except UnicodeDecodeError as err:
@@ -208,8 +208,8 @@ class MyFrame(wx.Frame):
 
     def serial_autoroll(self):
         while self.serial.isOpen() and self.checkbox_autoroll.IsChecked():
-            self.serial.write(str_hex_to_c('FE 00 A0 AA'))
-            print str_hex_to_c('FE 00 A0 AA')
+            self.serial.write(str_hex_to_c('FE 00 21 AA'))
+            #print str_hex_to_c('FE 00 A0 AA')
             time.sleep(1)
         thread.exit_thread()
 
