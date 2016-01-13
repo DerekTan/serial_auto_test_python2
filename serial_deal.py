@@ -8,12 +8,13 @@ class DevFrame(wx.Frame):
     def __init__(self):
         wx.Frame.__init__(self, None, id = -1, title = "Online Device", size = (700, 500), name = "online_dev")
         self.text_intro = wx.TextCtrl(self, style=wx.TE_LEFT| wx.TE_READONLY)
-        self.gs_dev = wx.GridSizer(10,10, 4, 5) #cols, vgap, hgap
+        self.gs_dev = wx.GridSizer(cols = 5, rows = 5, vgap = 4, hgap = 5) #cols, vgap, hgap
         #gs_dev.Add(wx.StaticText(self), wx.EXPAND)
 
         self.__set_properties()
         self.__do_layout()
         self.__attach_events()
+        self.update_online_devlst([1,2,3])
 
     def __do_layout(self):
         vbox = wx.BoxSizer(wx.VERTICAL)
@@ -33,7 +34,7 @@ class DevFrame(wx.Frame):
         newlst = []
         for dev in devlst:
             #gs_dev.Add(wx.StaticText(self, ), wx.EXPAND)
-            self.gs_dev.Add(wx.Button(self, label=str(dev)), wx.EXPAND)
+            self.gs_dev.Add(wx.Button(self, -1, label=str(dev)), 0, wx.EXPAND)
             if dev in self.devlst:
                 #update_dev_status(dev, ONLINE)
                 offlst.remove(dev)
@@ -46,6 +47,7 @@ class SerialDeal:
     def __init__(self, fn):
         self.data = ''
         self.online = []
+        self.devstate = {}
         self.logfile = fn
         #self.devframe = DevFrame()
         #self.devframe.Show()
@@ -76,23 +78,24 @@ class SerialDeal:
                     tmpdev = ord(c)
                 else:
                     tmpdev += ord(c) << 8
-                    devlst.append(tmpdev)
+                    devstr = '%04x'%tmpdev #convert to a str
+                    devlst.append(devstr)
                     #print type(tmpdev)
-                    if tmpdev in self.online:
-                        #print tmpdev, 'in online'
+                    if devstr in self.online:
+                        #print devstr, 'in online'
                         pass
                     else:
-                        #print tmpdev, 'not in online'
-                        newlst.append(tmpdev)
+                        #print devstr, 'not in online'
+                        newlst.append(devstr)
                 n = (n+1) % 2
 
-            for tmpdev in self.online:
-                if tmpdev not in devlst:
+            for devstr in self.online:
+                if devstr not in devlst:
                     self.logfile.write(current_time() + ':'
-                            + 'device gone: ' + str(tmpdev) + '\n')
+                            + 'device gone: ' + devstr + '\n')
                     self.logfile.flush()
 
-                    print 'device gone:', str(tmpdev)
+                    print 'device gone:', devstr
             if len(newlst):
                 self.logfile.write(current_time() + ':'
                         + 'new device: ' + str(newlst) + '\n')
@@ -100,6 +103,18 @@ class SerialDeal:
                 print 'newlst:',newlst
             self.online = devlst[:]
             #self.devframe.update_online_devlst(devlst)
+        if cmd == chr(0x87):
+            tmpdev = ord(data[0]) + (ord(data[1]) << 8)
+            state = ord(data[2])
+            self.devstate[tmpdev] = state
+
+    def pop_dev_state(self, dev):
+        if dev in self.devstate:
+            return self.devstate.pop(dev)
+        else:
+            return None
+
+
 
 class MyApp(wx.App):
     """Test code"""
