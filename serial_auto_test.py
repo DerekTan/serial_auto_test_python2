@@ -45,14 +45,11 @@ class MyFrame(wx.Frame):
         #tx
         self.tx_panel = wx.Panel(self, -1)
         self.tx_staticbox = wx.StaticBox(self.tx_panel, -1, "Transmit Data")
-        self.tx_text_1 = wx.TextCtrl(self.tx_panel, pos = (10, 210), style = wx.EXPAND)
-        self.tx_text_2 = wx.TextCtrl(self.tx_panel, pos = (10, 210), style = wx.EXPAND)
-        self.tx_text_3 = wx.TextCtrl(self.tx_panel, pos = (10, 210), style = wx.EXPAND)
-        self.tx_text_4 = wx.TextCtrl(self.tx_panel, pos = (10, 210), style = wx.EXPAND)
-        self.button_send_1 = wx.Button(self.tx_panel, -1, label='Send')
-        self.button_send_2 = wx.Button(self.tx_panel, -1, label='Send')
-        self.button_send_3 = wx.Button(self.tx_panel, -1, label='Send')
-        self.button_send_4 = wx.Button(self.tx_panel, -1, label='Send')
+        self.text_tx = []
+        self.button_tx = []
+        for i in xrange(4):
+            self.text_tx.append( wx.TextCtrl(self.tx_panel, -1, size= (400, 25), style = wx.EXPAND) )
+            self.button_tx.append( wx.Button(self.tx_panel, -1, label = "Send") )
 
         self.__set_properties()
         self.__do_layout()
@@ -108,18 +105,22 @@ class MyFrame(wx.Frame):
         rx_sizer.Add(self.rx_text, 1, wx.EXPAND, 0)
         self.rx_panel.SetSizer(rx_sizer)
 
+        # tx
         self.tx_staticbox.Lower()
-        tx_sizer = wx.StaticBoxSizer(self.tx_staticbox, wx.VERTICAL)
-        tx_sizer.Add(self.tx_text_1, 1, wx.EXPAND, 0)
-        tx_sizer.Add(self.tx_text_2, 1, wx.EXPAND, 0)
-        tx_sizer.Add(self.tx_text_3, 1, wx.EXPAND, 0)
-        tx_sizer.Add(self.tx_text_4, 1, wx.EXPAND, 0)
-        tx_sizer.Add(self.button_send_1, 0, wx.ALIGN_RIGHT, 0)
-        tx_sizer.Add(self.button_send_2, 0, wx.ALIGN_RIGHT, 0)
-        tx_sizer.Add(self.button_send_3, 0, wx.ALIGN_RIGHT, 0)
-        tx_sizer.Add(self.button_send_4, 0, wx.ALIGN_RIGHT, 0)
-        self.tx_panel.SetSizer(tx_sizer)
+        sb_tx_sizer = wx.StaticBoxSizer(self.tx_staticbox, wx.VERTICAL)
 
+        tx_sizer = wx.FlexGridSizer(rows = 4, cols = 2, vgap = 5, hgap = 5)
+
+        for i in xrange(4):
+            tx_sizer.Add(self.text_tx[i], proportion = 1, flag = wx.EXPAND)
+            tx_sizer.Add(self.button_tx[i], proportion = 0)
+
+        tx_sizer.AddGrowableCol(0, proportion = 1) # set column 0 growable, 
+
+        sb_tx_sizer.Add(tx_sizer)
+        self.tx_panel.SetSizerAndFit(sb_tx_sizer)
+
+        # right vertical sizer
         rvsizer = wx.BoxSizer(wx.VERTICAL)
         rvsizer.Add(self.rx_panel, 1, wx.EXPAND, 0)
         rvsizer.Add(self.tx_panel, 1, wx.EXPAND, 0)
@@ -138,7 +139,10 @@ class MyFrame(wx.Frame):
         self.Bind(wx.EVT_BUTTON, self.onclick_rxclear, self.button_clear_rx)
         self.Bind(wx.EVT_CHECKBOX, self.oncheck_autoroll, self.checkbox_autoroll)
         self.Bind(wx.EVT_CHECKBOX, self.oncheck_autostate, self.checkbox_autostate)
-        self.Bind(wx.EVT_BUTTON, self.oncheck_send, self.button_send_1)
+
+        # bind button_tx[]
+        for i in xrange(4):
+            self.button_tx[i].Bind( wx.EVT_BUTTON, lambda event, button_num = i : self.onclick_tx(event, button_num) )
 
     def onclick_OnOff(self, event):
         if self.button_onoff.GetLabel() == 'Open':
@@ -232,13 +236,10 @@ class MyFrame(wx.Frame):
             time.sleep(1)
         thread.exit_thread()
 
-    def oncheck_send(self, event):
+    def onclick_tx(self, event, num):
         if self.serial.isOpen():
-            print self.tx_text_1.GetNumberOfLines()
-            for n in range(0, self.tx_text_1.GetNumberOfLines()):
-                #print n,
-                outstr = self.tx_text_1.GetLineText(n)
-                #print outstr
+            if self.text_tx[num].GetNumberOfLines():
+                outstr = self.text_tx[num].GetLineText(1)
                 self.serial.write(str_hex_to_c(outstr))
 
     def oncheck_autostate(self, event):
