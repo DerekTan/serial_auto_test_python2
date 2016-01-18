@@ -40,16 +40,17 @@ class MyFrame(wx.Frame):
         #rx
         self.rx_panel = wx.Panel(self, -1)
         self.rx_staticbox = wx.StaticBox(self.rx_panel, -1, "Received Data")
-        self.rx_text = wx.TextCtrl(self.rx_panel, pos = (10, 10), size = (700, 200), style = wx.TE_MULTILINE | wx.TE_READONLY | wx.EXPAND)
+        self.rx_text = wx.TextCtrl(self.rx_panel, pos = (10, 10), style = wx.TE_MULTILINE | wx.TE_READONLY | wx.EXPAND)
 
         #tx
         self.tx_panel = wx.Panel(self, -1)
         self.tx_staticbox = wx.StaticBox(self.tx_panel, -1, "Transmit Data")
+
         self.text_tx = []
         self.button_tx = []
         for i in xrange(4):
-            self.text_tx.append( wx.TextCtrl(self.tx_panel, -1, size= (400, 25), style = wx.EXPAND) )
-            self.button_tx.append( wx.Button(self.tx_panel, -1, label = "Send") )
+            self.text_tx.append( wx.TextCtrl(self.tx_panel, -1, style = wx.EXPAND) )
+            self.button_tx.append( wx.Button(self.tx_panel, -1, label = "Send", style = wx.ALIGN_RIGHT) )
 
         self.__set_properties()
         self.__do_layout()
@@ -100,7 +101,7 @@ class MyFrame(wx.Frame):
         cf_sizer.Add(self.checkbox_autostate, 0, wx.EXPAND | wx.ALL, 0)
         self.cf_panel.SetSizer(cf_sizer)
 
-        self.rx_staticbox.Lower()
+        #self.rx_staticbox.Lower()
         rx_sizer = wx.StaticBoxSizer(self.rx_staticbox, wx.VERTICAL)
         rx_sizer.Add(self.rx_text, 1, wx.EXPAND, 0)
         self.rx_panel.SetSizer(rx_sizer)
@@ -117,18 +118,17 @@ class MyFrame(wx.Frame):
 
         tx_sizer.AddGrowableCol(0, proportion = 1) # set column 0 growable, 
 
-        sb_tx_sizer.Add(tx_sizer)
+        sb_tx_sizer.Add(tx_sizer, 1, wx.EXPAND)
         self.tx_panel.SetSizerAndFit(sb_tx_sizer)
 
         # right vertical sizer
         rvsizer = wx.BoxSizer(wx.VERTICAL)
         rvsizer.Add(self.rx_panel, 1, wx.EXPAND, 0)
         rvsizer.Add(self.tx_panel, 1, wx.EXPAND, 0)
-        #self.rx_panel.SetSizer(rvsizer)
 
         hsizer = wx.BoxSizer(wx.HORIZONTAL)
         hsizer.Add(self.cf_panel, 0, wx.EXPAND, 0)
-        hsizer.Add(rvsizer, 0, wx.ALL | wx.ALIGN_RIGHT, 0)
+        hsizer.Add(rvsizer, 1, wx.EXPAND, 0)
         #hsizer.Add()
         self.SetSizer(hsizer)
         self.Layout()
