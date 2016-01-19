@@ -57,14 +57,21 @@ class SerialDeal:
         start_idx = -1
         start_idx = self.data.find(chr(0xfe))
         while -1 != start_idx:
-            data_len = ord(self.data[start_idx + 1])
-            cmd = self.data[start_idx + 2]
-            data_idx = start_idx + 3
+            self.data = self.data[start_idx:]
+            if len(self.data) <= 3: #at least 4 bytes
+                print "Error[1]! msg is shorter then 4 bytes:", self.data
+                return
+            data_len = ord(self.data[1])
+            cmd = self.data[2]
+            data_idx = 3
+            if len(self.data) < data_idx + data_len + 1: #make sure the message is completely received
+                print "Error[2]! msg not received completely:", self.data
+                return
             if self.data[data_idx + data_len] == chr(0xaa):
                 self.deal(cmd, self.data[data_idx : data_idx+data_len])
                 self.data = self.data[data_idx+data_len+1:]
             else:
-                self.data = self.data[start_idx+1:]
+                self.data = self.data[1:]
             start_idx = self.data.find(chr(0xfe))
 
     def deal(self, cmd, data):
@@ -107,6 +114,39 @@ class SerialDeal:
             tmpdev = ord(data[0]) + (ord(data[1]) << 8)
             state = ord(data[2])
             self.devstate[tmpdev] = state
+
+        if cmd == chr(0xa0):
+            n = 0
+            for c in data[2:]:
+                if n == 0:
+                    tmpdev = ord(c)
+                else:
+                    tmpdev += ord(c) << 8
+                    devstr = '%04x'%tmpdev #convert to a str
+                    devlst.append(devstr)
+                    #print type(tmpdev)
+                    if devstr in self.online:
+                        #print devstr, 'in online'
+                        pass
+                    else:
+                        #print devstr, 'not in online'
+                        newlst.append(devstr)
+                n = (n+1) % 2
+
+            for devstr in self.online:
+                if devstr not in devlst:
+                    self.logfile.write(current_time() + ':'
+                            + 'device gone: ' + devstr + '\n')
+                    self.logfile.flush()
+
+                    print 'device gone:', devstr
+            if len(newlst):
+                self.logfile.write(current_time() + ':'
+                        + 'new device: ' + str(newlst) + '\n')
+                self.logfile.flush()
+                print 'newlst:',newlst
+            self.online = devlst[:]
+
 
     def pop_dev_state(self, dev):
         if dev in self.devstate:

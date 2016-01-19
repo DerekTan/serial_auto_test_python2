@@ -17,6 +17,9 @@ def current_time():
 class MyFrame(wx.Frame):
     def __init__(self):
         self.serial = serial.Serial()
+        self.f_autoroll = False
+        self.f_autostate = False
+        self.f_autotx = [False, False, False, False]
         self.group = {1: [0x6ed3, 0x9694],
                       2: [0x8ad6, 0xcf0e, 0x0f01, 0x745f, 
                           0xe5b1, 0x642b, 0xcd88, 0xe37f,
@@ -47,9 +50,11 @@ class MyFrame(wx.Frame):
         self.tx_staticbox = wx.StaticBox(self.tx_panel, -1, "Transmit Data")
 
         self.text_tx = []
+        self.checkbox_tx = []
         self.button_tx = []
         for i in xrange(4):
             self.text_tx.append( wx.TextCtrl(self.tx_panel, -1, style = wx.EXPAND) )
+            self.checkbox_tx.append( wx.CheckBox(self.tx_panel, -1, label = "auto") )
             self.button_tx.append( wx.Button(self.tx_panel, -1, label = "Send", style = wx.ALIGN_RIGHT) )
 
         self.__set_properties()
@@ -110,11 +115,12 @@ class MyFrame(wx.Frame):
         self.tx_staticbox.Lower()
         sb_tx_sizer = wx.StaticBoxSizer(self.tx_staticbox, wx.VERTICAL)
 
-        tx_sizer = wx.FlexGridSizer(rows = 4, cols = 2, vgap = 5, hgap = 5)
+        tx_sizer = wx.FlexGridSizer(rows = 4, cols = 3, vgap = 5, hgap = 5)
 
         for i in xrange(4):
             tx_sizer.Add(self.text_tx[i], proportion = 1, flag = wx.EXPAND)
-            tx_sizer.Add(self.button_tx[i], proportion = 0)
+            tx_sizer.Add(self.checkbox_tx[i], proportion = 0, flag = wx.ALIGN_CENTRE)
+            tx_sizer.Add(self.button_tx[i], proportion = 0, flag = wx.ALIGN_CENTRE)
 
         tx_sizer.AddGrowableCol(0, proportion = 1) # set column 0 growable, 
 
@@ -143,6 +149,7 @@ class MyFrame(wx.Frame):
         # bind button_tx[]
         for i in xrange(4):
             self.button_tx[i].Bind( wx.EVT_BUTTON, lambda event, button_num = i : self.onclick_tx(event, button_num) )
+            self.checkbox_tx[i].Bind( wx.EVT_CHECKBOX, lambda event, checkbox_num = i : self.oncheck_autotx(event, checkbox_num) )
 
     def onclick_OnOff(self, event):
         if self.button_onoff.GetLabel() == 'Open':
@@ -210,7 +217,8 @@ class MyFrame(wx.Frame):
                 try:
                     self.rx_text.AppendText(instr)
                 except UnicodeDecodeError as err:
-                    print str(err)
+                    pass
+                    #print str(err)
                 self.rx_text.AppendText(']')
                 self.rx_text.AppendText(str_c_to_hex(instr))
                 self.rx_text.AppendText('\n')
@@ -225,15 +233,18 @@ class MyFrame(wx.Frame):
 
     def oncheck_autoroll(self, event):
         if self.checkbox_autoroll.IsChecked():
-            thread.start_new_thread(self.serial_autoroll,())
+            if self.f_autoroll == False:
+                thread.start_new_thread(self.serial_autoroll,())
         else:
             pass
 
     def serial_autoroll(self):
+        self.f_autoroll = True
         while self.serial.isOpen() and self.checkbox_autoroll.IsChecked():
             self.serial.write(str_hex_to_c('FE 00 21 AA'))
             #print str_hex_to_c('FE 00 A0 AA')
             time.sleep(1)
+        self.f_autoroll = False
         thread.exit_thread()
 
     def onclick_tx(self, event, num):
@@ -242,13 +253,33 @@ class MyFrame(wx.Frame):
                 outstr = self.text_tx[num].GetLineText(1)
                 self.serial.write(str_hex_to_c(outstr))
 
+    def oncheck_autotx(self, event, num):
+        if self.serial.isOpen() and self.checkbox_tx[num].IsChecked():
+            if self.text_tx[num].GetNumberOfLines():
+                outstr = self.text_tx[num].GetLineText(1)
+                if self.f_autotx[num] == False:
+                    thread.start_new_thread(self.serial_autotx, (num, outstr))
+
+    def serial_autotx(self, num, outstr, interval = 1):
+        #print "new thread"
+        self.f_autotx[num] = True
+        while self.serial.isOpen() and self.checkbox_tx[num].IsChecked():
+            self.serial.write(str_hex_to_c(outstr))
+            #print "send:", outstr
+            time.sleep(interval)
+        #print "thread exit"
+        self.f_autotx[num] = False
+        thread.exit_thread()
+
     def oncheck_autostate(self, event):
         if self.checkbox_autostate.IsChecked():
-            thread.start_new_thread(self.autotest_set_get_dev_state, ())
+            if self.f_autostate == False:
+                thread.start_new_thread(self.autotest_set_get_dev_state, ())
         else:
             pass
 
     def autotest_set_get_dev_state(self): #new thread
+        self.f_autostate = True
         with open(time.strftime("%Y-%m-%d_%H-%M-%S") + '-state_test.log', 'a') as f2:
             state = 0
             while self.serial.isOpen() and self.checkbox_autostate.IsChecked():
@@ -257,6 +288,7 @@ class MyFrame(wx.Frame):
                     time.sleep(1)
                     self.check_group_state(grpid, state, f2)
                 state = int(not state)
+        self.f_autostate = False
         thread.exit_thread()
 
     def set_group_state(self, grpid, state):
