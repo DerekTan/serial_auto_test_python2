@@ -4,76 +4,84 @@ import time
 import wx
 import os
 
-result = {}
-all_dev = set()
-start_time = None
-end_time = None
-time_format = "%Y-%m-%d %H:%M:%S"
-def deal_new_line(ln):
-    global result, all_dev
-    newlst = eval(ln.split(':')[-1])
-    #print newlst
-    #print set(newlst)
-    #print all_dev
-    all_dev.update(set(newlst))
+class DataAnalyse:
+    def __init__(self, fn, textctrl):
+        self.fin = fn
+        self.textctrl = textctrl
+        self.dict_gone_dev = {}
+        self.all_dev = set()
 
-def deal_gone_line(ln):
-    global result, all_dev
-    gone_dev = ln.split(':')[-1].strip()
-    if result.has_key(gone_dev):
-        result[gone_dev] = result[gone_dev] + 1
-    else:
-        result[gone_dev] = 1
+        self.do_analyse()
+        self.show_result()
 
-def deal_line(ln):
-    if 'new'in ln:
-        deal_new_line(ln)
-    elif 'gone' in ln:
-        deal_gone_line(ln)
+    def deal_new_line(self, ln):
+        newlst = eval(ln.split(':')[-1])
+        self.all_dev.update(set(newlst))
 
-def print_result():
-    global result, all_dev
-    #print 'result:', result
-    print 'all devices:', list(all_dev)
-    gone_devs_sorted_list = sorted(result.iteritems(), key = lambda x:x[1], reverse = False)
+    def deal_gone_line(self, ln):
+        gone_dev = ln.split(':')[-1].strip()
+        if self.dict_gone_dev.has_key(gone_dev):
+            self.dict_gone_dev[gone_dev] = self.dict_gone_dev[gone_dev] + 1
+        else:
+            self.dict_gone_dev[gone_dev] = 1
 
-    offline_times = 0
-    for item in gone_devs_sorted_list:
-        print item[0], ':', item[1]
-        offline_times += item[1]
+    def deal_line(self, ln):
+        if 'new'in ln:
+            self.deal_new_line(ln)
+        elif 'gone' in ln:
+            self.deal_gone_line(ln)
 
-    print len(result), 'devices have been offlined.'
-    last_seconds = time.mktime(end_time) - time.mktime(start_time)
-    print 'Total offline times:', offline_times
-    print 'Total time:', last_seconds, 'seconds'
-    if offline_times == 0:
-        print 'No Device offlined.'
-    else:
-        print 'Device goes offline every', last_seconds / offline_times, 'seconds.'
+    def show_result(self):
+        self.textctrl.Clear()
+        # all devices
+        gone_devs_sorted_list = sorted(self.dict_gone_dev.iteritems(), key = lambda x:x[1], reverse = False)
 
-    gone_devs_set = set(x for x in result)
-    unknown_dev = list(gone_devs_set - all_dev)
-    if len(unknown_dev):
-        print 'unknown device', unknown_dev, 'left'
-    left_dev_lst = list(all_dev - gone_devs_set)
-    if len(left_dev_lst):
-        print left_dev_lst, 'is always online!'
+        print 'Total %d devices:'% len(self.all_dev), list(self.all_dev)
+        self.textctrl.AppendText('Total %d devices:'% len(self.all_dev) + str(list(self.all_dev)) + '\n')
+        print len(self.dict_gone_dev), 'devices have been dropped:'
+        self.textctrl.AppendText('%d devices have been dropped.\n'% len(self.dict_gone_dev))
+
+        offline_times = 0
+        for item in gone_devs_sorted_list:
+            print item[0], ':', item[1]
+            self.textctrl.AppendText('\t'+ str(item[0]) + ' : ' + str(item[1]) + '\n')
+            offline_times += item[1]
+
+        last_seconds = time.mktime(self.end_time) - time.mktime(self.start_time)
+        print 'Total offline times:', offline_times
+        self.textctrl.AppendText('Total offline times: %d\n'% offline_times)
+        print 'Test time:', last_seconds, 'seconds'
+        self.textctrl.AppendText('Test time: %d seconds\n' % last_seconds)
+        if offline_times == 0:
+            print 'No Device dropped.'
+            self.textctrl.AppendText('No Device dropped.\n')
+        else:
+            print 'Device goes offline every', last_seconds / offline_times, 'seconds.'
+            self.textctrl.AppendText('Device goes offline every %f seconds.\n'% (last_seconds / offline_times))
+
+        gone_devs_set = set(x for x in self.dict_gone_dev)
+        unknown_dev = list(gone_devs_set - self.all_dev)
+        left_dev_lst = list(self.all_dev - gone_devs_set)
+        if len(unknown_dev):
+            print 'unknown device', unknown_dev, 'left'
+            self.textctrl.AppendText('unknown device' + str(unknown_dev) + 'left\n')
+        if len(left_dev_lst):
+            print left_dev_lst, 'is always online!'
+            self.textctrl.AppendText(str(left_dev_lst) + ' is always online!\n')
 
 
-def analyse_main(fn):
-    global start_time, end_time
-    with open(fn, 'r') as f:
-        lines = f.readlines()
-        start_time = time.strptime(lines[0][:len("2016-01-19 17:24:54")], time_format)
-        end_time = time.strptime(lines[-1][:len("2016-01-19 17:24:54")], time_format)
-        for eachLine in lines:
-            deal_line(eachLine)
-    print_result()
-
+    def do_analyse(self):
+        time_format = "%Y-%m-%d %H:%M:%S"
+        with open(self.fin, 'r') as f:
+            lines = f.readlines()
+            self.start_time = time.strptime(lines[0][:len("2016-01-19 17:24:54")], time_format)
+            self.end_time = time.strptime(lines[-1][:len("2016-01-19 17:24:54")], time_format)
+            for eachLine in lines:
+                self.deal_line(eachLine)
 
 class MyFrame(wx.Frame):
     def __init__(self):
-        wx.Frame.__init__(self, parent = None, id = -1, title ="ZigBee Device Test Log Analyse")
+        wx.Frame.__init__(self, parent = None, id = -1, title ="ZigBee Device Test Log Analyse", size = (700, 500))
 
         self.panel = wx.Panel(self, -1)
         self.st_fin = wx.StaticText(self.panel, -1, 'Log file:')
@@ -89,7 +97,7 @@ class MyFrame(wx.Frame):
         self.__do_layout()
 
     def __set_properity(self):
-        self.fin = ''
+        self.fin = None
         self.fout = None
 
     def __do_layout(self):
@@ -119,15 +127,15 @@ class MyFrame(wx.Frame):
         wildcard = "log file (*.log)|*.log|" "text file (*.txt)|*.txt|" "All files (*.*)|*.*"
         dialog = wx.FileDialog(parent = None, message = "Choose a file", defaultDir = os.getcwd(), defaultFile = "", wildcard = wildcard, style = wx.OPEN | wx.CHANGE_DIR )
         if dialog.ShowModal() == wx.ID_OK:
-            self.fin = dialog.GetPath()
             self.tc_fin.Clear()
-            self.tc_fin.WriteText(self.fin)
+            self.tc_fin.WriteText(dialog.GetPath())
         dialog.Destroy()
 
     def on_clk_analyse(self, event):
+        self.fin = self.tc_fin.GetLineText(1)
         if os.path.isfile(self.fin): #green
             self.tc_out.Clear()
-            analyse_main(self.fin)
+            self.analyse = DataAnalyse(self.fin, self.tc_out)
         else:
             pass #red
 
@@ -135,6 +143,7 @@ class MyApp(wx.App):
     def OnInit(self):
         frame = MyFrame()
         frame.Show(True)
+        frame.Center(wx.BOTH)
         self.SetTopWindow(frame)
         return True
 
